@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dark Animus — Map Assignment Tool (v4.3)</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#111a33;
+      --text:#e8ecff; --muted:#aab3d6; --border:rgba(255,255,255,.12);
+      --good:#3ddc97; --warn:#ffcc66; --elec:#4ea3ff;
+      --numY:#ffcc66; --numR:#ff6b6b; --numW:#e8ecff;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 800px at 20% 0%, #18224a 0%, var(--bg) 55%);
+      color:var(--text);
+    }
+    header{
+      padding:14px 16px; border-bottom:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+      position: sticky; top:0; backdrop-filter: blur(6px); z-index:10;
+    }
+    header h1{margin:0; font-size:15px}
+    header .sub{margin-top:4px; color:var(--muted); font-size:12px; line-height:1.35}
+
+    main{ padding:14px; display:grid; grid-template-columns: 380px 1fr; gap:12px; align-items:start; }
+    @media (max-width: 1040px){ main{grid-template-columns: 1fr} }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)) , var(--panel);
+      border:1px solid var(--border); border-radius:14px; padding:12px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.25);
+    }
+    .card h2{ margin:0 0 8px 0; font-size:13px; letter-spacing:.2px; }
+    .tiny{font-size:12px; color:var(--muted); line-height:1.35}
+    .divider{height:1px; background: var(--border); margin:10px 0}
+    .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .btn{
+      background: rgba(255,255,255,.08); border:1px solid var(--border); color:var(--text);
+      padding:7px 10px; border-radius:10px; cursor:pointer; font-size:12px;
+      transition: transform .06s ease, background .15s ease; user-select:none;
+    }
+    .btn:hover{background: rgba(255,255,255,.12)}
+    .btn:active{transform: translateY(1px)}
+    .btn.primary{background: rgba(61,220,151,.14); border-color: rgba(61,220,151,.35)}
+    .btn.danger{background: rgba(255,107,107,.14); border-color: rgba(255,107,107,.35)}
+    .pill{font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border);
+      color:var(--muted); background: rgba(255,255,255,.05);
+    }
+
+    .mapWrap{ position: relative; border-radius:14px; border:1px solid var(--border);
+      overflow:hidden; background:#0a0f20;
+    }
+    .mapToolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .mapToolbar .left, .mapToolbar .right{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .mapCanvas{
+      position:relative; width:100%; max-width: 1600px; margin:0 auto;
+      aspect-ratio: 2048 / 1146;
+      background-size: cover; background-position:center; background-repeat:no-repeat;
+      touch-action: none;
+    }
+
+    .linesLayer{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      pointer-events:none;
+    }
+
+    .token{
+      position:absolute; transform: translate(-50%, -50%);
+      display:flex; align-items:center; gap:8px;
+      padding:6px 8px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+      box-shadow: 0 8px 20px rgba(0,0,0,.25);
+      cursor: grab; user-select:none;
+    }
+    .token:active{cursor: grabbing}
+    .token.selected{ outline:2px solid rgba(255,204,102,.95); outline-offset:2px; }
+    .token .icon{
+      width:26px; height:26px; border-radius:10px;
+      border:1px solid rgba(255,255,255,.20);
+      background-size: cover;
+      background-position:center;
+      background-repeat:no-repeat;
+      background-color: rgba(255,255,255,.08);
+      flex:0 0 auto;
+    }
+    .token .labelWrap{min-width:0}
+    .token .label{font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .token .sub{font-size:11px; color:var(--muted)}
+
+    .golem{
+      position:absolute; transform: translate(-50%, -50%);
+      border-radius:999px; user-select:none;
+      display:grid; place-items:center; font-weight:900;
+      cursor:pointer;
+      background: rgba(15,23,48,.72);
+      border:2px solid rgba(255,255,255,.35);
+      color:var(--text);
+    }
+    .golem.small{ width: 26px; height: 26px; font-size:11px; }
+    .golem.large{ width: 44px; height: 44px; font-size:12px; }
+    .golem.active{ border-color: rgba(61,220,151,.75); box-shadow: 0 0 0 3px rgba(61,220,151,.14); }
+    .golem.inactive{
+      border-color: rgba(78,163,255,.85);
+      background: rgba(30,111,255,.18);
+      box-shadow: 0 0 0 3px rgba(78,163,255,.16), 0 0 18px rgba(78,163,255,.35);
+    }
+    .golem.selected{ outline: 2px solid rgba(255,204,102,.95); outline-offset: 2px; }
+    .golem .numY{ color: var(--numY); }
+    .golem .numR{ color: var(--numR); }
+    .golem .numW{ color: var(--numW); }
+
+    .palette{ display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:8px; }
+    .palette .pbtn{
+      display:flex; align-items:center; gap:8px; padding:8px;
+      border-radius:12px; border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      cursor: grab; user-select:none;
+    }
+    .palette .pbtn:active{cursor: grabbing}
+    .palette .pbtn .picon{
+      width:26px; height:26px; border-radius:10px;
+      border:1px solid rgba(255,255,255,.20);
+      background-size: cover; background-position:center; background-repeat:no-repeat;
+      background-color: rgba(255,255,255,.08);
+      flex: 0 0 auto;
+    }
+
+    textarea{
+      width:100%; background: rgba(255,255,255,.06); border:1px solid var(--border);
+      color:var(--text); border-radius:12px; padding:10px; font-size:12px; outline:none;
+      min-height:110px; resize: vertical;
+    }
+    kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:11px; padding:1px 6px; border-radius:7px;
+      border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
+      color:var(--text);
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Dark Animus (Heroic) — Interactive Assignment Map (v4.3)</h1>
+  <div class="sub">
+    <b>Move tokens:</b> drag normally.  
+    <b>Assign line:</b> <kbd>Shift</kbd> + drag a token onto a golem (repeat for multiple).  
+    <b>Clear token lines:</b> <kbd>Shift</kbd> + click token (release without dropping on a golem).  
+    <b>Number golem:</b> click golem then press <kbd>1–9</kbd>; reset with <kbd>0</kbd> or <kbd>Backspace</kbd>. Color: <kbd>Y</kbd>/<kbd>R</kbd>/<kbd>W</kbd>.
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Map image</h2>
+    <div class="tiny">Upload your screenshot once — it’s saved in your browser.</div>
+    <div class="row" style="margin-top:8px;">
+      <label class="btn">
+        Upload map
+        <input id="mapUpload" type="file" accept="image/*" style="display:none" />
+      </label>
+      <button class="btn" id="clearMapBtn">Clear saved map</button>
+      <span class="pill" id="mapStatus">No map loaded</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2>Golems</h2>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn primary" id="editModeBtn">Edit Mode: OFF</button>
+      <button class="btn" id="allActiveBtn">Set all Active</button>
+      <button class="btn danger" id="deleteSelectedBtn">Delete selected golem</button>
+    </div>
+    <div class="tiny" style="margin-top:8px;">
+      In Edit Mode:
+      <ul style="margin:6px 0 0 18px; padding:0; color:var(--muted); font-size:12px; line-height:1.35;">
+        <li>Drag golems to reposition</li>
+        <li><kbd>Shift</kbd> + click map: add <b>Small</b> golem</li>
+        <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + click map: add <b>Large</b> golem</li>
+        <li>Select a golem then press <kbd>Delete</kbd></li>
+      </ul>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2>Class palette (MoP icons)</h2>
+    <div class="tiny">Drag out tokens. Tokens spawn icon-only. Double-click token to set a custom label.</div>
+    <div class="palette" id="palette" style="margin-top:8px;"></div>
+
+    <div class="divider"></div>
+
+    <h2>Optional: paste roster (spawns tokens)</h2>
+    <div class="tiny">Format: <code>Name - Class - Role</code> (Class/Role optional).</div>
+    <textarea id="rosterInput" placeholder="Tris - Warrior - Tank&#10;Alice - Priest - Heals&#10;Bob - Rogue"></textarea>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn primary" id="loadRosterBtn">Load / Replace roster tokens</button>
+      <button class="btn" id="addRosterBtn">Add roster tokens</button>
+      <button class="btn danger" id="clearTokensBtn">Clear tokens</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2>Save / share</h2>
+    <div class="row">
+      <button class="btn" id="exportBtn">Export JSON</button>
+      <button class="btn" id="importBtn">Import JSON</button>
+      <button class="btn danger" id="resetBtn">Reset everything</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="mapToolbar">
+      <div class="left">
+        <h2 style="margin:0;">Room Map</h2>
+        <span class="pill" id="kpi"></span>
+      </div>
+      <div class="right">
+        <button class="btn" id="clearLinksBtn">Clear ALL lines</button>
+        <button class="btn danger" id="deleteTokenBtn">Delete selected token</button>
+      </div>
+    </div>
+
+    <div class="mapWrap">
+      <div id="mapCanvas" class="mapCanvas">
+        <svg id="linesLayer" class="linesLayer"></svg>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const LS_KEY = "da_map_assigner_v43";
+
+  const DEFAULT_GOLEMS = [
+    {"id":"L1","name":"Large 1","x":20.691,"y":22.451,"type":"large","active":true},
+    {"id":"L2","name":"Large 2","x":77.977,"y":22.631,"type":"large","active":true},
+    {"id":"L3","name":"Large 3","x":20.630,"y":32.533,"type":"large","active":true},
+    {"id":"L4","name":"Large 4","x":78.146,"y":32.684,"type":"large","active":true},
+    {"id":"L5","name":"Large 5","x":20.129,"y":67.515,"type":"large","active":true},
+    {"id":"L6","name":"Large 6","x":81.005,"y":67.412,"type":"large","active":true},
+    {"id":"L7","name":"Large 7","x":20.161,"y":81.282,"type":"large","active":true},
+    {"id":"L8","name":"Large 8","x":81.093,"y":81.240,"type":"large","active":true},
+
+    {"id":"S1","name":"Small 1","x":59.254,"y":8.658,"type":"small","active":true},
+    {"id":"S2","name":"Small 2","x":63.590,"y":8.658,"type":"small","active":true},
+    {"id":"S3","name":"Small 3","x":35.449,"y":8.732,"type":"small","active":true},
+    {"id":"S4","name":"Small 4","x":39.760,"y":8.732,"type":"small","active":true},
+    {"id":"S5","name":"Small 5","x":45.802,"y":18.003,"type":"small","active":true},
+    {"id":"S6","name":"Small 6","x":48.807,"y":18.003,"type":"small","active":true},
+    {"id":"S7","name":"Small 7","x":51.818,"y":18.003,"type":"small","active":true},
+    {"id":"S8","name":"Small 8","x":24.104,"y":20.792,"type":"small","active":true},
+    {"id":"S9","name":"Small 9","x":24.093,"y":25.741,"type":"small","active":true},
+    {"id":"S10","name":"Small 10","x":24.100,"y":30.727,"type":"small","active":true},
+    {"id":"S11","name":"Small 11","x":75.704,"y":20.925,"type":"small","active":true},
+    {"id":"S12","name":"Small 12","x":75.720,"y":25.879,"type":"small","active":true},
+    {"id":"S13","name":"Small 13","x":75.713,"y":30.863,"type":"small","active":true},
+    {"id":"S14","name":"Small 14","x":17.077,"y":26.077,"type":"small","active":true},
+    {"id":"S15","name":"Small 15","x":17.077,"y":33.181,"type":"small","active":true},
+    {"id":"S16","name":"Small 16","x":17.077,"y":40.270,"type":"small","active":true},
+    {"id":"S17","name":"Small 17","x":82.866,"y":26.118,"type":"small","active":true},
+    {"id":"S18","name":"Small 18","x":82.866,"y":33.205,"type":"small","active":true},
+    {"id":"S19","name":"Small 19","x":82.866,"y":40.310,"type":"small","active":true},
+    {"id":"S20","name":"Small 20","x":30.522,"y":46.178,"type":"small","active":true},
+    {"id":"S21","name":"Small 21","x":69.486,"y":46.196,"type":"small","active":true},
+    {"id":"S22","name":"Small 22","x":30.522,"y":55.438,"type":"small","active":true},
+    {"id":"S23","name":"Small 23","x":69.486,"y":55.452,"type":"small","active":true},
+    {"id":"S24","name":"Small 24","x":30.522,"y":64.674,"type":"small","active":true},
+    {"id":"S25","name":"Small 25","x":69.486,"y":64.686,"type":"small","active":true},
+  ];
+
+  const CLASS_DATA = [
+    {key:"Warrior",      icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_warrior.jpg"},
+    {key:"Paladin",      icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_paladin.jpg"},
+    {key:"Hunter",       icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_hunter.jpg"},
+    {key:"Rogue",        icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_rogue.jpg"},
+    {key:"Priest",       icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_priest.jpg"},
+    {key:"Shaman",       icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_shaman.jpg"},
+    {key:"Mage",         icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_mage.jpg"},
+    {key:"Warlock",      icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_warlock.jpg"},
+    {key:"Druid",        icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_druid.jpg"},
+    {key:"Death Knight", icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_deathknight.jpg"},
+    {key:"Monk",         icon:"https://wow.zamimg.com/images/wow/icons/large/classicon_monk.jpg"},
+  ];
+
+  const DEFAULT_STATE = {
+    mapDataUrl: null,
+    golems: structuredClone(DEFAULT_GOLEMS),
+    tokens: [],
+    links: [], // {id, tokenId, golemId}
+    selectedTokenId: null,
+    selectedGolemId: null,
+    editMode: false
+  };
+
+  let state = loadState() ?? structuredClone(DEFAULT_STATE);
+  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+  function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); renderKPI(); }
+  function loadState(){ try{ const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; }catch{ return null; } }
+  function resetAll(){ localStorage.removeItem(LS_KEY); state = structuredClone(DEFAULT_STATE); saveState(); renderAll(); }
+
+  const mapCanvas = document.getElementById("mapCanvas");
+  const linesLayer = document.getElementById("linesLayer");
+  const palette = document.getElementById("palette");
+  const kpi = document.getElementById("kpi");
+  const mapStatus = document.getElementById("mapStatus");
+
+  function classInfo(classKey){ return CLASS_DATA.find(c => c.key.toLowerCase() === (classKey||"").toLowerCase()); }
+  function getGolem(id){ return state.golems.find(g=>g.id===id); }
+  function getToken(id){ return state.tokens.find(t=>t.id===id); }
+
+  function pxToPct(xPx, yPx){
+    const rect = mapCanvas.getBoundingClientRect();
+    return { x: (xPx / rect.width) * 100, y: (yPx / rect.height) * 100 };
+  }
+  function clampPct(p){ return { x: Math.max(0, Math.min(100, p.x)), y: Math.max(0, Math.min(100, p.y)) }; }
+
+  function setMapBackground(){
+    if(state.mapDataUrl){
+      mapCanvas.style.backgroundImage = `url("${state.mapDataUrl}")`;
+      mapStatus.textContent = "Map loaded";
+    }else{
+      mapCanvas.style.backgroundImage = "none";
+      mapStatus.textContent = "No map loaded";
+    }
+  }
+
+  function renderPalette(){
+    palette.innerHTML = "";
+    for(const c of CLASS_DATA){
+      const btn = document.createElement("div");
+      btn.className = "pbtn";
+      btn.draggable = true;
+
+      const icon = document.createElement("div");
+      icon.className = "picon";
+      icon.style.backgroundImage = `url("${c.icon}")`;
+
+      const txt = document.createElement("div");
+      txt.style.minWidth = 0;
+      txt.innerHTML = `<div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.key}</div>
+                       <div class="tiny">drag to map</div>`;
+
+      btn.appendChild(icon); btn.appendChild(txt);
+      btn.addEventListener("dragstart", (e)=>{
+        e.dataTransfer.setData("text/plain", JSON.stringify({type:"class", classKey:c.key}));
+        e.dataTransfer.effectAllowed = "copy";
+      });
+      palette.appendChild(btn);
+    }
+  }
+
+  function golemDisplayText(g){
+    if(g?.mark && Number.isInteger(g.mark) && g.mark >= 1 && g.mark <= 9) return String(g.mark);
+    return g.type === "large" ? "L" : "S";
+  }
+  function golemDisplayClass(g){
+    const c = (g?.markColor || "W").toUpperCase();
+    if(c === "Y") return "numY";
+    if(c === "R") return "numR";
+    return "numW";
+  }
+
+  function renderGolems(){
+    mapCanvas.querySelectorAll(".golem").forEach(el => el.remove());
+
+    for(const g of state.golems){
+      const el = document.createElement("div");
+      el.className = `golem ${g.type} ${g.active ? "active" : "inactive"} ${g.id===state.selectedGolemId ? "selected" : ""}`;
+      el.style.left = g.x + "%";
+      el.style.top  = g.y + "%";
+      el.dataset.gid = g.id;
+
+      const inner = document.createElement("span");
+      inner.className = golemDisplayClass(g);
+      inner.textContent = golemDisplayText(g);
+      el.appendChild(inner);
+
+      el.addEventListener("click", (e)=>{
+        e.stopPropagation();
+
+        // Select always
+        state.selectedGolemId = g.id;
+        state.selectedTokenId = null;
+        saveState(); renderGolems(); renderTokens();
+
+        // Alt+click rename
+        if(e.altKey){
+          const next = prompt("Rename golem:", g.name);
+          if(next !== null){ g.name = next.trim() || g.name; saveState(); }
+          return;
+        }
+
+        // Normal mode: toggle active/electrified
+        if(!state.editMode){
+          g.active = !g.active;
+          saveState(); renderGolems(); renderLines();
+        }
+      });
+
+      el.addEventListener("dblclick", (e)=>{
+        e.stopPropagation();
+        if(state.editMode){
+          g.active = !g.active;
+          saveState(); renderGolems(); renderLines();
+        }
+      });
+
+      if(state.editMode){
+        el.addEventListener("mousedown", (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          startDrag({kind:"golem", id:g.id}, e.clientX, e.clientY);
+        });
+      }
+
+      mapCanvas.appendChild(el);
+    }
+  }
+
+  function renderTokens(){
+    mapCanvas.querySelectorAll(".token").forEach(el => el.remove());
+
+    for(const t of state.tokens){
+      const el = document.createElement("div");
+      el.className = "token" + (t.id===state.selectedTokenId ? " selected" : "");
+      el.dataset.tid = t.id;
+      el.style.left = t.x + "%";
+      el.style.top  = t.y + "%";
+
+      const info = classInfo(t.classKey);
+
+      const icon = document.createElement("div");
+      icon.className = "icon";
+      icon.style.backgroundImage = info?.icon ? `url("${info.icon}")` : "none";
+
+      const labelWrap = document.createElement("div");
+      labelWrap.className = "labelWrap";
+
+      if(t.label || t.sub){
+        const main = document.createElement("div");
+        main.className = "label";
+        main.textContent = t.label || "";
+        labelWrap.appendChild(main);
+
+        if(t.sub){
+          const sub = document.createElement("div");
+          sub.className = "sub";
+          sub.textContent = t.sub;
+          labelWrap.appendChild(sub);
+        }
+      }
+
+      el.appendChild(icon);
+      el.appendChild(labelWrap);
+
+      el.addEventListener("dblclick", ()=>{
+        const current = t.sub ? `${t.label || ""} - ${t.sub}` : (t.label || "");
+        const next = prompt("Set token label (Player - Spec/Role). Leave blank for icon-only:", current);
+        if(next === null) return;
+        const parts = next.split(" - ");
+        t.label = (parts[0]||"").trim();
+        t.sub = parts.slice(1).join(" - ").trim();
+        saveState(); renderTokens();
+      });
+
+      // IMPORTANT: Shift+click reset is now handled by link-drag ending with no golem drop.
+      el.addEventListener("mousedown", (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        state.selectedTokenId = t.id;
+        state.selectedGolemId = null;
+        saveState(); renderTokens(); renderGolems();
+
+        if(e.shiftKey){
+          startLinkDrag(t.id, e.clientX, e.clientY);
+        }else{
+          startDrag({kind:"token", id:t.id}, e.clientX, e.clientY);
+        }
+      });
+
+      mapCanvas.appendChild(el);
+    }
+  }
+
+  // Lines (percentage coords) + TEMP drag line
+  let linkDrag = null; // {tokenId, xPct, yPct, startX, startY, didMove}
+  function renderLines(){
+    linesLayer.innerHTML = "";
+
+    for(const ln of state.links){
+      const t = getToken(ln.tokenId);
+      const g = getGolem(ln.golemId);
+      if(!t || !g) continue;
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1", `${t.x}%`);
+      line.setAttribute("y1", `${t.y}%`);
+      line.setAttribute("x2", `${g.x}%`);
+      line.setAttribute("y2", `${g.y}%`);
+      line.setAttribute("stroke", g.active ? "rgba(255,255,255,.85)" : "rgba(78,163,255,.95)");
+      line.setAttribute("stroke-width", "6");
+      line.setAttribute("stroke-linecap", "round");
+      line.setAttribute("opacity", "0.35");
+      linesLayer.appendChild(line);
+    }
+
+    if(linkDrag){
+      const t = getToken(linkDrag.tokenId);
+      if(t){
+        const temp = document.createElementNS("http://www.w3.org/2000/svg","line");
+        temp.setAttribute("x1", `${t.x}%`);
+        temp.setAttribute("y1", `${t.y}%`);
+        temp.setAttribute("x2", `${linkDrag.xPct}%`);
+        temp.setAttribute("y2", `${linkDrag.yPct}%`);
+        temp.setAttribute("stroke", "rgba(255,204,102,.95)");
+        temp.setAttribute("stroke-width", "6");
+        temp.setAttribute("stroke-linecap", "round");
+        temp.setAttribute("opacity", "0.55");
+        linesLayer.appendChild(temp);
+      }
+    }
+  }
+
+  function renderKPI(){
+    const totalTokens = state.tokens.length;
+    const links = state.links.length;
+    const activeSmall = state.golems.filter(g=>g.type==="small" && g.active).length;
+    const activeLarge = state.golems.filter(g=>g.type==="large" && g.active).length;
+    const totalSmall = state.golems.filter(g=>g.type==="small").length;
+    const totalLarge = state.golems.filter(g=>g.type==="large").length;
+    kpi.textContent = `${totalTokens} tokens • ${links} lines • Small ${activeSmall}/${totalSmall} active • Large ${activeLarge}/${totalLarge} active`;
+  }
+
+  function renderAll(){
+    setMapBackground();
+    renderPalette();
+    renderGolems();
+    renderTokens();
+    renderLines();
+    renderKPI();
+    document.getElementById("editModeBtn").textContent = `Edit Mode: ${state.editMode ? "ON" : "OFF"}`;
+  }
+
+  // Palette -> map spawn
+  mapCanvas.addEventListener("dragover", (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+  mapCanvas.addEventListener("drop", (e)=>{
+    e.preventDefault();
+    const rect = mapCanvas.getBoundingClientRect();
+    const pct = clampPct(pxToPct(e.clientX - rect.left, e.clientY - rect.top));
+    let payload = null;
+    try{ payload = JSON.parse(e.dataTransfer.getData("text/plain")); }catch{}
+    if(payload?.type === "class"){
+      state.tokens.push({ id: uid(), x: pct.x, y: pct.y, classKey: payload.classKey, label:"", sub:"" });
+      state.selectedTokenId = state.tokens[state.tokens.length-1].id;
+      state.selectedGolemId = null;
+      saveState();
+      renderTokens(); renderLines(); renderKPI();
+    }
+  });
+
+  // Add golems in edit mode
+  mapCanvas.addEventListener("click", (e)=>{
+    if(state.editMode && e.shiftKey){
+      const rect = mapCanvas.getBoundingClientRect();
+      const pct = clampPct(pxToPct(e.clientX - rect.left, e.clientY - rect.top));
+      const isLarge = e.ctrlKey;
+      const type = isLarge ? "large" : "small";
+      const nextNum = 1 + state.golems.filter(g=>g.type===type).length;
+      const idPrefix = isLarge ? "L" : "S";
+      state.golems.push({
+        id: `${idPrefix}${nextNum}-${uid().slice(0,4)}`,
+        name: `${isLarge ? "Large" : "Small"} ${nextNum}`,
+        x: pct.x, y: pct.y, type, active: true
+      });
+      state.selectedGolemId = state.golems[state.golems.length-1].id;
+      state.selectedTokenId = null;
+      saveState(); renderGolems(); renderLines(); renderKPI();
+      return;
+    }
+    state.selectedGolemId = null;
+    saveState(); renderGolems();
+  });
+
+  // Drag token/golem
+  let drag = null;
+  function startDrag(obj, clientX, clientY){
+    drag = obj;
+    onDragMove({clientX, clientY});
+    document.addEventListener("mousemove", onDragMove, true);
+    document.addEventListener("mouseup", endDrag, true);
+  }
+  function onDragMove(e){
+    if(!drag) return;
+    const rect = mapCanvas.getBoundingClientRect();
+    const pct = clampPct(pxToPct(e.clientX - rect.left, e.clientY - rect.top));
+
+    if(drag.kind === "token"){
+      const t = getToken(drag.id);
+      if(!t) return;
+      t.x = pct.x; t.y = pct.y;
+      saveState();
+      const el = mapCanvas.querySelector(`.token[data-tid="${t.id}"]`);
+      if(el){ el.style.left = t.x + "%"; el.style.top = t.y + "%"; }
+      renderLines();
+    }else{
+      const g = getGolem(drag.id);
+      if(!g) return;
+      g.x = pct.x; g.y = pct.y;
+      saveState();
+      const el = mapCanvas.querySelector(`.golem[data-gid="${g.id}"]`);
+      if(el){ el.style.left = g.x + "%"; el.style.top = g.y + "%"; }
+      renderLines();
+    }
+  }
+  function endDrag(){
+    if(!drag) return;
+    drag = null;
+    document.removeEventListener("mousemove", onDragMove, true);
+    document.removeEventListener("mouseup", endDrag, true);
+  }
+
+  // Shift-drag linking (release without drop = reset token links)
+  function startLinkDrag(tokenId, clientX, clientY){
+    const rect = mapCanvas.getBoundingClientRect();
+    const pct = clampPct(pxToPct(clientX - rect.left, clientY - rect.top));
+    linkDrag = { tokenId, xPct: pct.x, yPct: pct.y, startX: clientX, startY: clientY, didMove: false };
+    renderLines();
+    document.addEventListener("mousemove", onLinkMove, true);
+    document.addEventListener("mouseup", endLinkDrag, true);
+  }
+  function onLinkMove(e){
+    if(!linkDrag) return;
+    const dist = Math.hypot(e.clientX - linkDrag.startX, e.clientY - linkDrag.startY);
+    if(dist > 3) linkDrag.didMove = true;
+
+    const rect = mapCanvas.getBoundingClientRect();
+    const pct = clampPct(pxToPct(e.clientX - rect.left, e.clientY - rect.top));
+    linkDrag.xPct = pct.x; linkDrag.yPct = pct.y;
+    renderLines();
+  }
+  function endLinkDrag(e){
+    if(!linkDrag) return;
+
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const golemEl = target?.closest?.(".golem");
+    if(golemEl){
+      const gid = golemEl.dataset.gid;
+      const tid = linkDrag.tokenId;
+
+      const exists = state.links.some(l => l.tokenId === tid && l.golemId === gid);
+      if(!exists){
+        state.links.push({ id: uid(), tokenId: tid, golemId: gid });
+        saveState();
+      }
+    } else {
+      // THIS is the reliable “Shift+click reset”:
+      // releasing Shift-drag without dropping on a golem clears that token's links.
+      const tid = linkDrag.tokenId;
+      state.links = state.links.filter(l => l.tokenId !== tid);
+      saveState();
+    }
+
+    linkDrag = null;
+    document.removeEventListener("mousemove", onLinkMove, true);
+    document.removeEventListener("mouseup", endLinkDrag, true);
+    renderLines(); renderKPI();
+  }
+
+  // Keyboard: delete, golem numbering/color
+  window.addEventListener("keydown", (e)=>{
+    const gid = state.selectedGolemId ? getGolem(state.selectedGolemId) : null;
+
+    // Numbering a selected golem with 1-9, reset with 0/backspace
+    if(gid){
+      if(e.key >= "1" && e.key <= "9"){
+        gid.mark = parseInt(e.key, 10);
+        if(!gid.markColor) gid.markColor = "W";
+        saveState(); renderGolems(); renderLines();
+        return;
+      }
+      if(e.key === "0" || e.key === "Backspace"){
+        gid.mark = null;
+        gid.markColor = "W";
+        saveState(); renderGolems(); renderLines();
+        // fall through for Backspace delete handling? we stop here to avoid deleting
+        return;
+      }
+      if(e.key.toLowerCase() === "y"){
+        gid.markColor = "Y";
+        saveState(); renderGolems();
+        return;
+      }
+      if(e.key.toLowerCase() === "r"){
+        gid.markColor = "R";
+        saveState(); renderGolems();
+        return;
+      }
+      if(e.key.toLowerCase() === "w"){
+        gid.markColor = "W";
+        saveState(); renderGolems();
+        return;
+      }
+    }
+
+    // Delete selected token/golem
+    if(e.key !== "Delete" && e.key !== "Backspace") return;
+
+    if(state.selectedGolemId){
+      const delGid = state.selectedGolemId;
+      state.golems = state.golems.filter(g=>g.id !== delGid);
+      state.links = state.links.filter(l => l.golemId !== delGid);
+      state.selectedGolemId = null;
+      saveState(); renderGolems(); renderLines(); renderKPI();
+    }else if(state.selectedTokenId){
+      const tid = state.selectedTokenId;
+      state.tokens = state.tokens.filter(t=>t.id !== tid);
+      state.links = state.links.filter(l => l.tokenId !== tid);
+      state.selectedTokenId = null;
+      saveState(); renderTokens(); renderLines(); renderKPI();
+    }
+  });
+
+  // Roster parsing -> tokens
+  function parseRosterLine(line){
+    const parts = line.split(" - ").map(s=>s.trim()).filter(Boolean);
+    return { label: parts[0] || "", classKey: parts[1] || "", sub: parts.slice(2).join(" - ") };
+  }
+  function addRosterTokens(lines, replace){
+    const cleaned = lines.map(s=>s.trim()).filter(Boolean);
+    if(replace){ state.tokens = []; state.links = []; }
+
+    let y = 14;
+    for(const line of cleaned){
+      const p = parseRosterLine(line);
+      const info = classInfo(p.classKey);
+      state.tokens.push({
+        id: uid(),
+        x: 50 + (Math.random()*6 - 3),
+        y,
+        classKey: info ? info.key : (p.classKey || ""),
+        label: p.label || "",
+        sub: p.sub || ""
+      });
+      y += 5.2;
+      if(y > 90) y = 14;
+    }
+    saveState(); renderTokens(); renderLines(); renderKPI();
+  }
+
+  // Buttons
+  document.getElementById("editModeBtn").addEventListener("click", ()=>{ state.editMode = !state.editMode; saveState(); renderAll(); });
+  document.getElementById("allActiveBtn").addEventListener("click", ()=>{ for(const g of state.golems) g.active = true; saveState(); renderGolems(); renderLines(); renderKPI(); });
+
+  document.getElementById("deleteSelectedBtn").addEventListener("click", ()=>{
+    if(!state.selectedGolemId) return;
+    const gid = state.selectedGolemId;
+    state.golems = state.golems.filter(g=>g.id !== gid);
+    state.links = state.links.filter(l => l.golemId !== gid);
+    state.selectedGolemId = null;
+    saveState(); renderGolems(); renderLines(); renderKPI();
+  });
+
+  document.getElementById("deleteTokenBtn").addEventListener("click", ()=>{
+    if(!state.selectedTokenId) return;
+    const tid = state.selectedTokenId;
+    state.tokens = state.tokens.filter(t=>t.id !== tid);
+    state.links = state.links.filter(l => l.tokenId !== tid);
+    state.selectedTokenId = null;
+    saveState(); renderTokens(); renderLines(); renderKPI();
+  });
+
+  document.getElementById("clearLinksBtn").addEventListener("click", ()=>{
+    if(confirm("Clear ALL lines?")){
+      state.links = [];
+      saveState(); renderLines(); renderKPI();
+    }
+  });
+
+  document.getElementById("loadRosterBtn").addEventListener("click", ()=> addRosterTokens(document.getElementById("rosterInput").value.split("\n"), true));
+  document.getElementById("addRosterBtn").addEventListener("click", ()=> addRosterTokens(document.getElementById("rosterInput").value.split("\n"), false));
+  document.getElementById("clearTokensBtn").addEventListener("click", ()=>{
+    if(confirm("Clear ALL tokens (and lines) from the map?")){
+      state.tokens = [];
+      state.links = [];
+      state.selectedTokenId = null;
+      saveState(); renderTokens(); renderLines(); renderKPI();
+    }
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", ()=>{
+    const data = JSON.stringify(state, null, 2);
+    navigator.clipboard.writeText(data).then(()=> alert("Export copied to clipboard!"))
+      .catch(()=> prompt("Copy this JSON:", data));
+  });
+
+  document.getElementById("importBtn").addEventListener("click", ()=>{
+    const raw = prompt("Paste exported JSON here:");
+    if(!raw) return;
+    try{
+      const next = JSON.parse(raw);
+      if(!next.golems || !next.tokens) throw new Error("Missing fields");
+      if(!next.links) next.links = [];
+      state = next;
+      saveState(); renderAll();
+    }catch(e){
+      alert("Could not import JSON: " + e.message);
+    }
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", ()=>{
+    if(confirm("Reset everything (map + golems + tokens + lines)?")){
+      resetAll();
+    }
+  });
+
+  document.getElementById("mapUpload").addEventListener("change", async (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+    const dataUrl = await new Promise((resolve, reject)=>{
+      const r = new FileReader();
+      r.onload = ()=>resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    state.mapDataUrl = dataUrl;
+    saveState();
+    setMapBackground();
+  });
+
+  document.getElementById("clearMapBtn").addEventListener("click", ()=>{ state.mapDataUrl = null; saveState(); setMapBackground(); });
+
+  // Boot
+  saveState();
+  renderAll();
+  window.addEventListener("resize", ()=> renderLines());
+</script>
+</body>
+</html>
