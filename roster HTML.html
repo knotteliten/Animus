@@ -233,6 +233,8 @@
 
 <script>
   const LS_KEY = "da_map_assigner_v43";
+// Default map file in the same folder as your HTML
+const DEFAULT_MAP_URL = "./plan.png";
 
   const DEFAULT_GOLEMS = [
     {"id":"L1","name":"Large 1","x":20.691,"y":22.451,"type":"large","active":true},
@@ -318,15 +320,13 @@
   }
   function clampPct(p){ return { x: Math.max(0, Math.min(100, p.x)), y: Math.max(0, Math.min(100, p.y)) }; }
 
-  function setMapBackground(){
-    if(state.mapDataUrl){
-      mapCanvas.style.backgroundImage = `url("${state.mapDataUrl}")`;
-      mapStatus.textContent = "Map loaded";
-    }else{
-      mapCanvas.style.backgroundImage = "none";
-      mapStatus.textContent = "No map loaded";
-    }
-  }
+function setMapBackground(){
+  const url = state.mapDataUrl || DEFAULT_MAP_URL;
+
+  mapCanvas.style.backgroundImage = `url("${url}")`;
+  mapStatus.textContent = state.mapDataUrl ? "Custom map loaded" : "Default map loaded";
+}
+
 
   function renderPalette(){
     palette.innerHTML = "";
